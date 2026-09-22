@@ -18,6 +18,7 @@
   "skill": {
     "repository": "/root/deskcomm-mcp-skill",
     "implementation_commit": "15ac293463a55989c08a7a2ac4755e6849786afb",
+    "hardening_commit": "f6f619981bec12757bf08ba46f68f1914d9f5e9e",
     "version": "0.1.0",
     "clients": {
       "codex_cli": "validated with 0.155.1 and temporary HOME",
