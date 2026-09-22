@@ -35,14 +35,21 @@ export async function install(options) {
   const verification = options.verify === false
     ? null
     : await verifyConnection({ url, token, fetchImpl: options.fetchImpl ?? fetch });
-  const saved = await saveCredential({ profile, url, token, pathOptions });
-  const runtime = await installRuntime(pathOptions);
   const skillDir = skillInstallPath({ client, scope, projectRoot, ...pathOptions });
-  await installSkill(skillDir);
   const name = serverName(profile);
   const configFile = client === "codex"
     ? codexConfigPath({ scope, projectRoot, ...pathOptions })
     : claudeConfigPath({ scope, projectRoot, ...pathOptions });
+  let state = await loadState(pathOptions);
+  const managed = state.installations.some((record) => sameInstallation(record, {
+    client, scope, profile, project_root: scope === "project" ? projectRoot : null,
+  }));
+  if (!managed && await configHasServer(client, configFile, name)) {
+    throw new Error(`Já existe um servidor MCP chamado '${name}' que não foi criado por este instalador. Nada foi sobrescrito.`);
+  }
+  const saved = await saveCredential({ profile, url, token, pathOptions });
+  const runtime = await installRuntime(pathOptions);
+  await installSkill(skillDir);
 
   if (client === "codex") {
     const helperCommand = headerHelperCommand({
@@ -64,7 +71,6 @@ export async function install(options) {
     });
   }
 
-  let state = await loadState(pathOptions);
   state = upsertInstallation(state, {
     client,
     scope,
@@ -95,16 +101,19 @@ export async function uninstall(options) {
   const projectRoot = path.resolve(options.projectRoot ?? process.cwd());
   const pathOptions = options.pathOptions ?? {};
   const name = serverName(profile);
-  const configFile = client === "codex"
-    ? codexConfigPath({ scope, projectRoot, ...pathOptions })
-    : claudeConfigPath({ scope, projectRoot, ...pathOptions });
+  const state = await loadState(pathOptions);
+  const managedRecord = state.installations.find((record) => sameInstallation(record, {
+    client, scope, profile, project_root: scope === "project" ? projectRoot : null,
+  }));
+  if (!managedRecord) return { removedConfig: false, removedSkill: false, removedCredential: false };
+  const configFile = managedRecord.config_file;
   const removedConfig = client === "codex"
     ? await uninstallCodexConfig({ configFile, name })
     : await uninstallClaudeConfig({ configFile, name });
-  const skillDir = skillInstallPath({ client, scope, projectRoot, ...pathOptions });
-  if (await isManagedSkill(skillDir)) await removeIfExists(skillDir);
+  const skillDir = managedRecord.skill_dir;
+  const hadManagedSkill = await isManagedSkill(skillDir);
+  if (hadManagedSkill) await removeIfExists(skillDir);
 
-  const state = await loadState(pathOptions);
   const installations = state.installations.filter((record) => !(
     record.client === client && record.scope === scope && record.profile === profile &&
     (scope !== "project" || record.project_root === projectRoot)
@@ -115,7 +124,7 @@ export async function uninstall(options) {
     await removeIfExists(credentialPath(pathOptions, profile));
     removedCredential = true;
   }
-  return { removedConfig, removedSkill: !(await isManagedSkill(skillDir)), removedCredential };
+  return { removedConfig, removedSkill: hadManagedSkill, removedCredential };
 }
 
 export async function installationStatus({ client, scope = "project", profile = DEFAULT_PROFILE, projectRoot, pathOptions = {} }) {
@@ -189,4 +198,19 @@ function validateClient(client) {
 function validateScope(scope) {
   if (!SCOPES.has(scope)) throw new Error("Escopo inválido. Use project ou global.");
   return scope;
+}
+
+async function configHasServer(client, configFile, name) {
+  if (client === "codex") {
+    const content = await readText(configFile, "");
+    return content.includes(`[mcp_servers.${name}]`);
+  }
+  const content = await readJson(configFile, {});
+  return Boolean(content?.mcpServers?.[name]);
+}
+
+function sameInstallation(record, target) {
+  return record.client === target.client && record.scope === target.scope &&
+    record.profile === target.profile &&
+    (target.scope !== "project" || record.project_root === target.project_root);
 }
