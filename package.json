@@ -16,6 +16,7 @@
     "templates/",
     "SKILL.md",
     "README.md",
+    "release-manifest.json",
     "LICENSE"
   ],
   "scripts": {
