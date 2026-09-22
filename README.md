@@ -16,18 +16,18 @@ normaliza a URL.
 
 ## Instalação por NPX
 
-Enquanto este repositório ainda não possui remote, rode localmente:
+Para testar a cópia local, rode:
 
 ```bash
 npx /caminho/para/deskcomm-mcp-skill codex
 npx /caminho/para/deskcomm-mcp-skill claude
 ```
 
-Depois de publicar, use o proprietário real configurado no remote/package metadata:
+Para instalar a versão publicada no GitHub:
 
 ```bash
-npx github:<PROPRIETARIO_REAL>/deskcomm-mcp-skill codex
-npx github:<PROPRIETARIO_REAL>/deskcomm-mcp-skill claude
+npx github:lucascruzfl/deskcomm-mcp-skill codex
+npx github:lucascruzfl/deskcomm-mcp-skill claude
 ```
 
 O padrão instala no projeto atual. Acrescente `--global` para o nível do usuário. O token é pedido
