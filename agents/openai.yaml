@@ -1,0 +1,11 @@
+interface:
+  display_name: "Deskcomm MCP"
+  short_description: "Opera o CRM por descoberta MCP segura"
+  default_prompt: "Use o Deskcomm MCP para executar esta tarefa pelo fluxo DISCOVER → INSPECT → VALIDATE → EXECUTE → VERIFY."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "deskcomm"
+      description: "Servidor MCP da instalação DeskcommCRM"
+      transport: "streamable_http"

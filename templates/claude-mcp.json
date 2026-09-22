@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "deskcomm": {
+      "type": "stdio",
+      "command": "<node executable>",
+      "args": ["<user-level bridge>", "--credential", "<user-level credential file>"],
+      "env": {}
+    }
+  }
+}

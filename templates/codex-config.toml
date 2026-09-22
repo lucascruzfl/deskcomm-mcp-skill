@@ -1,0 +1,4 @@
+# Generated template. The installer writes the real profile without a token.
+[mcp_servers.deskcomm]
+url = "https://crm.example.invalid/api/mcp"
+http_headers_helper = "<user-level header helper command>"

@@ -1,0 +1,43 @@
+{
+  "name": "deskcomm-mcp-skill",
+  "version": "0.1.0",
+  "description": "Instalador reproduzível da Skill e da conexão MCP do DeskcommCRM para Codex CLI e Claude Code.",
+  "type": "module",
+  "bin": {
+    "deskcomm-mcp-skill": "bin/deskcomm-mcp-skill.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "runtime/",
+    "docs/",
+    "agents/",
+    "references/",
+    "templates/",
+    "SKILL.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:cross-platform": "node --test tests/cross-platform.test.mjs",
+    "test:mock-mcp": "node --test tests/mcp-client.test.mjs",
+    "test:installer": "node --test tests/installer.test.mjs",
+    "test:secrets": "node --test tests/secrets.test.mjs",
+    "lint": "node scripts/check-syntax.mjs",
+    "typecheck": "node scripts/check-syntax.mjs",
+    "verify": "npm run lint && npm test",
+    "pack:dry-run": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "deskcomm",
+    "mcp",
+    "codex",
+    "claude-code",
+    "skill"
+  ],
+  "license": "MIT"
+}
