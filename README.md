@@ -28,6 +28,51 @@ npx github:lucascruzfl/deskcomm-mcp-skill claude
 npx github:lucascruzfl/deskcomm-mcp-skill claude --global
 ```
 
+Na primeira instalação interativa, informe o nome do perfil, URL e token. A opção
+`--profile NOME` escolhe um perfil existente ou cadastra um novo. Com vários perfis, a
+instalação exige escolha explícita. Reinstalar um perfil existente usa sua credencial guardada,
+sem sobrescrevê-la quando não foi fornecido outro token.
+
+## Gerenciando vários clientes
+
+Cada cliente tem um perfil e um token próprios. Lucas e Vip Stetic podem usar o mesmo servidor
+Deskcomm, mas a mesma URL **não** significa o mesmo tenant. Codex e Claude Code recebem entradas
+MCP distintas, como `deskcomm-lucas` e `deskcomm-vip-stetic`.
+
+```text
+npx github:lucascruzfl/deskcomm-mcp-skill profiles add "Lucas" --url https://crm.exemplo.com.br
+npx github:lucascruzfl/deskcomm-mcp-skill profiles add "Vip Stetic" --url https://crm.exemplo.com.br
+npx github:lucascruzfl/deskcomm-mcp-skill profiles list
+npx github:lucascruzfl/deskcomm-mcp-skill profiles show vip-stetic
+npx github:lucascruzfl/deskcomm-mcp-skill profiles set-default lucas
+npx github:lucascruzfl/deskcomm-mcp-skill verify-connection --profile vip-stetic
+npx github:lucascruzfl/deskcomm-mcp-skill verify-all
+```
+
+`profiles add` pede o token sem eco e guarda a credencial fora do projeto. Para disponibilizar
+os dois perfis globalmente no Codex, execute:
+
+```text
+npx github:lucascruzfl/deskcomm-mcp-skill codex --global --profile lucas
+npx github:lucascruzfl/deskcomm-mcp-skill codex --global --profile vip-stetic
+```
+
+Troque `codex` por `claude` para registrar ambos no Claude Code. Perfis em VPS diferentes usam
+URLs diferentes no `profiles add`. O perfil padrão facilita comandos da CLI; o agente deve
+perguntar qual cliente operar quando o pedido for ambíguo.
+
+Para mudar URL, execute `profiles update NOME --url https://novo-host`. Para trocar o token,
+execute `profiles update NOME --token-env DESKCOMM_MCP_TOKEN` com a variável definida apenas no
+processo, ou `--token-stdin` por canal protegido. A atualização verifica a conexão e ajusta as
+entradas Codex existentes desse perfil. Para remover um cliente e suas integrações:
+
+```text
+npx github:lucascruzfl/deskcomm-mcp-skill profiles remove vip-stetic
+```
+
+Por padrão a credencial externa é preservada. `--delete-credential` a apaga explicitamente.
+Não há exportação de tokens nem deduplicação por URL.
+
 Use `--url https://seu-host` para informar a URL sem prompt. Use `--project-dir "C:\Users\Nome Sobrenome\Meu Projeto"`
 para escolher outro projeto. Em Windows, execute no PowerShell ou cmd; as aspas duplas protegem
 caminhos com espaços. O token não deve ser passado como argumento. Em automação, use
@@ -62,9 +107,8 @@ npx github:lucascruzfl/deskcomm-mcp-skill update
 
 O `npx` obtém o pacote atual do GitHub; `update` verifica todas as conexões gerenciadas e
 atualiza Skill e runtime registrados sem duplicar entrada MCP ou substituir configurações alheias.
-URL e token permanecem no perfil externo. Para mudar URL/token, reexecute o comando de instalação
-correspondente; a reinstalação é idempotente. Se uma entrada foi editada fora do instalador, ele
-interrompe para preservar a edição.
+O catálogo de perfis e as credenciais permanecem. Para mudar URL/token, use `profiles update`.
+Se uma entrada foi editada fora do instalador, ele interrompe para preservar a edição.
 
 ## Desinstalar
 
@@ -75,9 +119,10 @@ npx github:lucascruzfl/deskcomm-mcp-skill uninstall claude
 npx github:lucascruzfl/deskcomm-mcp-skill uninstall claude --global
 ```
 
-Remove apenas a Skill marcada como gerenciada e a entrada MCP do cliente correspondente. Outros
-MCPs, Skills e configurações ficam. A credencial externa permanece; use `--remove-credential`
-somente quando nenhum outro cliente usa o perfil e você realmente deseja apagá-la.
+Remove apenas a Skill marcada como gerenciada e a entrada MCP do cliente/perfil correspondente.
+Outros MCPs, perfis, Skills e configurações ficam. A credencial externa permanece; use
+`--remove-credential` somente quando nenhuma outra integração usa o perfil e você deseja apagar
+também o cadastro e a credencial.
 
 ## Segurança e operação
 

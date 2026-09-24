@@ -69,10 +69,13 @@ test("uninstall de um perfil preserva Skill e credencial de outro perfil", async
   const home = path.join(base, "home");
   const projectRoot = path.join(base, "project");
   const pathOptions = pathOptionsFor(home);
-  const mock = await startMockMcp();
+  const secondToken = ["dsk", "test_second_token"].join("_");
+  const mock = await startMockMcp({ tokenProfiles: {
+    [FAKE_TOKEN]: { toolCount: 3 }, [secondToken]: { toolCount: 2 },
+  } });
   try {
     const first = await install({ client: "codex", scope: "project", profile: "one", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
-    const second = await install({ client: "codex", scope: "project", profile: "two", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
+    const second = await install({ client: "codex", scope: "project", profile: "two", projectRoot, pathOptions, url: mock.url, token: secondToken });
     assert.equal(first.skillDir, second.skillDir);
     const removed = await uninstall({ client: "codex", scope: "project", profile: "one", projectRoot, pathOptions, removeCredential: true });
     assert.equal(removed.removedSkill, false);

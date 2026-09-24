@@ -39,6 +39,54 @@ test("CLI instala, verifica, diagnostica, atualiza e remove sem expor token", as
   } finally { await mock.close(); }
 });
 
+test("CLI administra dois clientes na mesma VPS sem misturar tokens", async () => {
+  const base = await mkdtemp(path.join(os.tmpdir(), "deskcomm-cli-profiles-"));
+  const home = path.join(base, "User Home");
+  const project = path.join(base, "My Project");
+  await mkdir(project, { recursive: true });
+  const secondToken = ["dsk", "test_second_client"].join("_");
+  const mock = await startMockMcp({ tokenProfiles: {
+    [FAKE_TOKEN]: { toolCount: 2 }, [secondToken]: { toolCount: 6 },
+  } });
+  const env = {
+    ...process.env,
+    HOME: home, USERPROFILE: home,
+    APPDATA: path.join(home, "AppData", "Roaming"),
+    XDG_CONFIG_HOME: path.join(home, ".config"),
+    FIXTURE_MCP_TOKEN_A: FAKE_TOKEN,
+    FIXTURE_MCP_TOKEN_B: secondToken,
+  };
+  try {
+    const commands = [
+      ["profiles", "add", "Lucas", "--url", mock.url, "--token-env", "FIXTURE_MCP_TOKEN_A"],
+      ["profiles", "add", "Vip Stetic", "--url", mock.url, "--token-env", "FIXTURE_MCP_TOKEN_B"],
+      ["profiles", "update", "vip-stetic", "--url", mock.url],
+      ["profiles", "set-default", "vip-stetic"],
+      ["codex", "--global", "--profile", "lucas"],
+      ["codex", "--global", "--profile", "vip-stetic"],
+      ["claude", "--global", "--profile", "lucas"],
+      ["claude", "--global", "--profile", "vip-stetic"],
+      ["profiles", "list"],
+      ["profiles", "show", "vip-stetic"],
+      ["verify-connection", "--profile", "vip-stetic"],
+      ["verify-all"],
+    ];
+    for (const args of commands) {
+      const result = await run(args, { cwd: project, env });
+      assert.equal(result.code, 0, `${args.join(" ")}: ${result.stderr}`);
+      assert.doesNotMatch(result.stdout + result.stderr, /dsk_test_/);
+      if (args[0] === "verify-all") {
+        assert.match(result.stdout, /lucas.*tools\/list: 2/);
+        assert.match(result.stdout, /vip-stetic.*tools\/list: 6/);
+      }
+    }
+    const removed = await run(["profiles", "remove", "vip-stetic", "--delete-credential"], { cwd: project, env });
+    assert.equal(removed.code, 0, removed.stderr);
+    assert.match(removed.stdout, /integrações: 2; credencial: apagada/);
+    assert.deepEqual(mock.calls.includes("tools/call"), false);
+  } finally { await mock.close(); }
+});
+
 function run(args, options) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.resolve("bin/deskcomm-mcp-skill.mjs"), ...args], {

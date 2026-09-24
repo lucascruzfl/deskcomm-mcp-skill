@@ -4,10 +4,29 @@ import { credentialMode } from "./credentials.mjs";
 import { installationStatus } from "./installer.mjs";
 import { verifyConnection } from "./mcp-client.mjs";
 import { normalizeMcpUrl } from "./url.mjs";
+import { findProfile, listCredentialIds, loadProfiles } from "./profiles.mjs";
+import { DEFAULT_PROFILE } from "./constants.mjs";
 
 export async function doctor(options) {
+  const selectedProfile = options.profile ?? DEFAULT_PROFILE;
   const status = await installationStatus(options);
   const checks = [];
+  let catalog;
+  try {
+    catalog = await loadProfiles(options.pathOptions ?? {});
+    checks.push(check("profile_catalog", true, "catálogo sem perfis duplicados"));
+  } catch (error) {
+    checks.push(check("profile_catalog", false, error.message));
+  }
+  const registered = catalog ? findProfile(catalog, selectedProfile) : null;
+  checks.push(check("profile_exists", Boolean(registered), registered
+    ? `perfil ${registered.id}` : `perfil ${selectedProfile} inexistente`));
+  if (catalog) {
+    const credentialIds = await listCredentialIds(options.pathOptions ?? {});
+    const orphans = credentialIds.filter((id) => !catalog.profiles.some((item) => item.id === id));
+    checks.push({ ...check("orphan_credentials", orphans.length === 0,
+      orphans.length ? `${orphans.length} credencial(is) sem perfil cadastrado` : "nenhuma"), optional: true });
+  }
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   checks.push(check("node", nodeMajor >= 20, `Node ${process.versions.node}`));
   const clientCommand = options.client === "claude" ? "claude" : "codex";
@@ -18,11 +37,15 @@ export async function doctor(options) {
     status.occurrences === 1 ? status.configFile : `${status.occurrences} entradas encontradas`));
   checks.push(check("duplicate_config", status.occurrences <= 1,
     status.occurrences > 1 ? "Configuração duplicada" : "sem duplicidade"));
-  checks.push(check("config_managed", status.configManaged, status.configManaged ? "entrada Deskcomm gerenciada" : "ausente ou alterada fora do instalador"));
+  checks.push(check("config_managed", status.configManaged, status.configManaged
+    ? "entrada Deskcomm gerenciada"
+    : status.occurrences ? "entrada Deskcomm órfã ou divergente" : "entrada Deskcomm ausente"));
   checks.push(check("skill", status.skillInstalled, status.skillDir));
   checks.push(check("credential", Boolean(status.credential), status.credentialFile));
 
   if (status.credential) {
+    checks.push(check("profile_credential_url", Boolean(registered) && registered.url === status.credential.url,
+      registered?.url === status.credential.url ? "URL do perfil e credencial coincidem" : "URL divergente ou perfil ausente"));
     let urlOk = false;
     try { urlOk = normalizeMcpUrl(status.credential.url) === status.credential.url; } catch { /* diagnostic below */ }
     checks.push(check("url_https_endpoint", urlOk, urlOk ? "URL MCP válida" : "URL MCP inválida ou insegura"));

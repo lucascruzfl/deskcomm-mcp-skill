@@ -1,5 +1,5 @@
 export const PACKAGE_NAME = "deskcomm-mcp-skill";
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 export const SKILL_NAME = "deskcomm-mcp";
 export const DEFAULT_PROFILE = "default";
 export const MCP_PATH = "/api/mcp";

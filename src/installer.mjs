@@ -17,6 +17,7 @@ import {
   skillInstallPath,
 } from "./paths.mjs";
 import { loadState, saveState, upsertInstallation } from "./state.mjs";
+import { assertTokenIsolated, findProfile, loadProfiles, registerProfile, saveProfiles, unregisterProfile } from "./profiles.mjs";
 import { normalizeMcpUrl } from "./url.mjs";
 import { verifyConnection } from "./mcp-client.mjs";
 
@@ -29,9 +30,21 @@ export async function install(options) {
   const projectRoot = path.resolve(options.projectRoot ?? process.cwd());
   const pathOptions = options.pathOptions ?? {};
   const oldCredential = await tryLoadCredential(profile, pathOptions);
+  const catalog = await loadProfiles(pathOptions);
+  const metadata = findProfile(catalog, profile);
+  if (metadata && oldCredential && metadata.url !== oldCredential.url) {
+    throw new Error("URL do perfil diverge da credencial; nenhuma conexão foi feita.");
+  }
   const url = normalizeMcpUrl(options.url ?? oldCredential?.url);
   const token = options.token ?? oldCredential?.token;
   if (!token) throw new Error("Token MCP ausente. Use entrada interativa, stdin ou uma variável de ambiente.");
+  await assertTokenIsolated(profile, token, pathOptions);
+  let state = await loadState(pathOptions);
+  const sameProfileInstallations = state.installations.filter((record) => record.profile === profile);
+  if (oldCredential && (oldCredential.url !== url || oldCredential.token !== token) &&
+      sameProfileInstallations.length > 1) {
+    throw new Error("Este perfil é usado por várias instalações. Use profiles update para atualizar todas juntas.");
+  }
   const verification = options.verify === false
     ? null
     : await verifyConnection({ url, token, fetchImpl: options.fetchImpl ?? fetch });
@@ -40,7 +53,6 @@ export async function install(options) {
   const configFile = client === "codex"
     ? codexConfigPath({ scope, projectRoot, ...pathOptions })
     : claudeConfigPath({ scope, projectRoot, ...pathOptions });
-  let state = await loadState(pathOptions);
   const managedRecord = state.installations.find((record) => sameInstallation(record, {
     client, scope, profile, project_root: scope === "project" ? projectRoot : null,
   }));
@@ -94,7 +106,59 @@ export async function install(options) {
     installed_version: VERSION,
   });
   await saveState(state, pathOptions);
+  await registerProfile({ name: options.profileName ?? profile, url, pathOptions, preferName: !oldCredential });
   return { client, scope, profile, url, configFile, skillDir, credentialFile: saved.file, protection: saved.protection, verification };
+}
+
+export async function reconfigureProfile({ profile, url, token, pathOptions = {}, fetchImpl = fetch }) {
+  const id = sanitizeProfile(profile);
+  const catalog = await loadProfiles(pathOptions);
+  const record = findProfile(catalog, id);
+  if (!record) throw new Error(`Perfil '${id}' não existe.`);
+  const previous = await loadCredential({ profile: id, pathOptions });
+  if (previous.url !== record.url) throw new Error("URL do perfil diverge da credencial; corrija antes de atualizar.");
+  const nextUrl = normalizeMcpUrl(url ?? previous.url);
+  const nextToken = token ?? previous.token;
+  await assertTokenIsolated(id, nextToken, pathOptions);
+  const verification = await verifyConnection({ url: nextUrl, token: nextToken, fetchImpl });
+  const state = await loadState(pathOptions);
+  const installations = state.installations.filter((item) => item.profile === id);
+  for (const item of installations) {
+    if (!(await configIsManaged(item.client, item.config_file, item.server_name, item.credential_file, pathOptions, item.config_definition))) {
+      throw new Error(`Configuração MCP divergente para ${item.client}/${item.scope}. Nada foi alterado.`);
+    }
+  }
+  const codexChanges = installations.filter((value) => value.client === "codex" && value.config_definition?.url !== nextUrl);
+  const originalConfigs = await Promise.all(codexChanges.map(async (item) => ({
+    file: item.config_file, content: await readText(item.config_file, ""),
+  })));
+  const updated = state.installations.map((item) => {
+    if (item.profile !== id || item.client !== "codex") return item;
+    return { ...item, config_definition: { ...item.config_definition, url: nextUrl } };
+  });
+  await saveCredential({ profile: id, url: nextUrl, token: nextToken, pathOptions });
+  try {
+    for (const item of codexChanges) {
+      await installCodexConfig({
+        configFile: item.config_file, name: item.server_name, url: nextUrl,
+        helperCommand: item.config_definition.helper_command,
+      });
+    }
+    await saveState({ ...state, installations: updated }, pathOptions);
+    await registerProfile({ name: record.name, url: nextUrl, pathOptions });
+  } catch (error) {
+    const restored = await Promise.allSettled([
+      saveCredential({ profile: id, url: previous.url, token: previous.token, pathOptions }),
+      ...originalConfigs.map((item) => atomicWrite(item.file, item.content, { mode: 0o600, backup: false })),
+      saveState(state, pathOptions),
+      saveProfiles(catalog, pathOptions),
+    ]);
+    if (restored.some((item) => item.status === "rejected")) {
+      throw new Error("Falha ao atualizar perfil; recuperação incompleta. Rode doctor antes de usar esta conexão.");
+    }
+    throw error;
+  }
+  return { profile: id, url: nextUrl, verification, installations: installations.length };
 }
 
 export async function updateInstallations({ pathOptions = {}, fetchImpl = fetch } = {}) {
@@ -143,6 +207,8 @@ export async function uninstall(options) {
   await saveState({ ...state, installations }, pathOptions);
   let removedCredential = false;
   if (options.removeCredential && !installations.some((record) => record.profile === profile) && configManaged) {
+    const catalog = await loadProfiles(pathOptions);
+    if (findProfile(catalog, profile)) await unregisterProfile(profile, pathOptions);
     await removeIfExists(credentialPath(pathOptions, profile));
     removedCredential = true;
   }

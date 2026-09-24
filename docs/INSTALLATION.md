@@ -7,6 +7,12 @@ o helper/bridge no diretório do usuário; o token nunca entra no projeto. `--gl
 configuração no nível do usuário. Um `--profile nome` permite manter instalações diferentes sem
 recompilar o pacote.
 
+O catálogo não secreto de perfis fica em `profiles.json` no diretório de configuração do usuário.
+Cada token fica em um arquivo próprio sob `profiles/`, fora do projeto. Na primeira instalação
+interativa, informe o nome do perfil. Com vários perfis, escolha explicitamente `--profile`.
+`profiles add` cadastra outro cliente sem sobrescrever os existentes; depois instale-o no Codex
+ou Claude com `--profile`.
+
 ## Entradas seguras
 
 O token pode vir de prompt sem eco, `--token-stdin` ou `--token-env NOME`. A URL pode ser uma base

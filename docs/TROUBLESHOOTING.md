@@ -18,5 +18,8 @@ Comece com `doctor <codex|claude>` e depois `verify-connection`.
 | conexão TLS/rede | URL/DNS/certificado | confirme HTTPS e acesso à base; nunca desative validação TLS |
 | timeout | endpoint lento ou indisponível | confira rede, proxy e disponibilidade; não repita mutações incertas |
 | Windows com espaços | quoting do helper/bridge | use caminho entre aspas duplas no PowerShell/cmd; rode doctor |
+| perfil inexistente ou duplicado | cadastro ausente ou corrompido | rode `profiles list` e `doctor --profile NOME`; não copie tokens entre perfis |
+| configuração órfã/divergente | entrada MCP alterada fora do instalador | revise a seção Deskcomm antes de atualizar ou remover |
+| URL do perfil divergente | metadata e credencial não coincidem | corrija o cadastro; a verificação não envia token a outra URL |
 
 O doctor também acusa configuração duplicada, Skill ausente e permissão POSIX diferente de 0600.

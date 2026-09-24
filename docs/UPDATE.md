@@ -6,6 +6,7 @@ cada perfil por handshake e `tools/list`, e verifica os marcadores de propriedad
 configuração. Ele preserva:
 
 - URL e token de cada perfil;
+- catálogo de perfis, nomes e perfil padrão;
 - escopo e projeto;
 - outros MCP servers;
 - demais configurações do Codex/Claude.

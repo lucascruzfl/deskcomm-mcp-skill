@@ -1,6 +1,6 @@
 {
   "name": "deskcomm-mcp-skill",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Instalador reproduzível da Skill e da conexão MCP do DeskcommCRM para Codex CLI e Claude Code.",
   "type": "module",
   "bin": {

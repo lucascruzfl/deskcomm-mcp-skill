@@ -10,6 +10,20 @@ visível ao token nessa sessão é a fonte de verdade. Versão, role, scopes, al
 e módulos opcionais podem alterar a lista. Zero ou poucas tools podem ser um resultado autorizado;
 diagnostique permissões e versão sem concluir automaticamente que o servidor falhou.
 
+## Escolher o cliente
+
+Uma instalação pode ter vários perfis, expostos como servidores MCP distintos
+(`deskcomm-<perfil>`; o perfil legado `default` usa `deskcomm`). Cada perfil tem seu próprio
+token e tenant, mesmo quando a URL é igual. Antes de ler ou alterar dados, identifique o perfil
+pedido pelo usuário e mantenha todas as chamadas da tarefa nesse servidor. Se houver mais de um
+perfil e a intenção não indicar qual cliente operar, pergunte: **"Qual cliente/perfil Deskcomm devo
+usar?"**. O perfil padrão da CLI é só conveniência e não resolve uma intenção ambígua do usuário.
+Nunca troque de perfil silenciosamente nem copie dados entre clientes sem pedido explícito.
+
+Faça `tools/list` separadamente no servidor escolhido. Scopes, allowlist, capabilities, módulos e
+schemas podem ser diferentes entre perfis; não combine catálogos nem reaproveite uma tool descoberta
+sob outro token sem redescobri-la no perfil atual.
+
 ## Fluxo obrigatório
 
 Use esta ordem em toda operação:

@@ -4,7 +4,8 @@ import os from "node:os";
 import { DEFAULT_PROFILE, SKILL_NAME } from "./constants.mjs";
 
 export function sanitizeProfile(value = DEFAULT_PROFILE) {
-  const normalized = String(value).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  const normalized = String(value).trim().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
   const clean = normalized.replace(/^-+|-+$/g, "");
   if (!clean || clean.length > 48) {
     throw new Error("Perfil inválido: use letras, números, hífen ou sublinhado (até 48 caracteres).");
@@ -28,6 +29,10 @@ export function credentialPath(options = {}, profile = DEFAULT_PROFILE) {
 
 export function statePath(options = {}) {
   return (options.platform === "win32" ? path.win32 : path).join(configRoot(options), "state.json");
+}
+
+export function profilesPath(options = {}) {
+  return (options.platform === "win32" ? path.win32 : path).join(configRoot(options), "profiles.json");
 }
 
 export function runtimeDir(options = {}) {

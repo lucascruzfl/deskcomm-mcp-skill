@@ -15,5 +15,9 @@ seções e outros MCPs permanecem intactos. Depois da instalação, reinicie uma
 `/mcp` ou `codex mcp get deskcomm --json` para inspecionar a entrada; `verify-connection` valida o
 servidor diretamente.
 
+Cada perfil nomeado cria uma seção distinta, como `[mcp_servers.deskcomm-lucas]` e
+`[mcp_servers.deskcomm-vip-stetic]`. Elas podem apontar para a mesma URL: cada helper lê a
+credencial do próprio perfil. O perfil legado `default` continua usando `deskcomm`.
+
 Referências oficiais: [MCP no Codex](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) e
 [Skills](https://learn.chatgpt.com/docs/build-skills).

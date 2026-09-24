@@ -11,6 +11,10 @@ repassa JSON-RPC ao endpoint Streamable HTTP; não imprime nem persiste o token 
 Outros `mcpServers` são preservados. O arquivo de projeto contém caminhos locais, nunca o token, e
 por isso não deve ser tratado como configuração portável de equipe sem revisão.
 
+Cada perfil nomeado vira uma entrada `mcpServers` separada. Mesmo com a mesma URL, cada bridge
+recebe apenas o caminho da credencial do perfil correspondente. O cadastro e a escolha de perfil
+seguem os comandos `profiles` do README.
+
 Nesta versão do pacote, a CLI Claude Code não estava instalada na máquina de desenvolvimento. O
 formato foi implementado a partir do contrato oficial e testado com HOME temporário, mock de config
 e bridge contra mock MCP; não se afirma teste real de `claude mcp` nesta VPS.
