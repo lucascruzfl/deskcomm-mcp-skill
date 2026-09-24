@@ -8,13 +8,13 @@ import test from "node:test";
 import { requestMcp, verifyConnection } from "../src/mcp-client.mjs";
 import { FAKE_TOKEN, startMockMcp } from "./helpers.mjs";
 
-for (const toolCount of [202, 203, 250]) {
+for (const toolCount of [0, 3, 400]) {
   test(`tools/list dinâmico aceita ${toolCount} tools`, async () => {
     const mock = await startMockMcp({ toolCount });
     try {
       const result = await verifyConnection({ url: mock.url, token: FAKE_TOKEN });
       assert.equal(result.tool_count, toolCount);
-      if (toolCount > 202) assert(result.tools.some((tool) => tool.name === "crm_unknown_future_tool"));
+      assert.deepEqual(mock.calls.includes("tools/call"), false);
     } finally {
       await mock.close();
     }
@@ -31,6 +31,55 @@ test("rejeita token inválido sem repeti-lo no erro", async () => {
   } finally {
     await mock.close();
   }
+});
+
+test("catálogo paginado e subconjunto de autorização são válidos", async () => {
+  const mock = await startMockMcp({ toolCount: 7, pageSize: 2 });
+  try {
+    const result = await verifyConnection({ url: mock.url, token: FAKE_TOKEN });
+    assert.equal(result.tool_count, 7);
+    assert.equal(mock.calls.filter((method) => method === "tools/list").length, 4);
+    assert.equal(result.duplicate_count, 0);
+  } finally { await mock.close(); }
+});
+
+test("tokens com scopes diferentes recebem subconjuntos válidos", async () => {
+  const readToken = "scope_read_fixture";
+  const fullToken = "scope_full_fixture";
+  const mock = await startMockMcp({
+    tokenProfiles: {
+      [readToken]: { scopes: ["contacts:read"], toolCount: 1 },
+      [fullToken]: { scopes: ["contacts:read", "messages:write"], toolCount: 9 },
+    },
+  });
+  try {
+    assert.equal((await verifyConnection({ url: mock.url, token: readToken })).tool_count, 1);
+    assert.equal((await verifyConnection({ url: mock.url, token: fullToken })).tool_count, 9);
+  } finally { await mock.close(); }
+});
+
+test("rejeita nomes duplicados", async () => {
+  const mock = await startMockMcp({ duplicate: true });
+  try {
+    await assert.rejects(verifyConnection({ url: mock.url, token: FAKE_TOKEN }), /duplicado/);
+  } finally { await mock.close(); }
+});
+
+test("distingue 403 de 401 e valida JSON-RPC", async () => {
+  const forbidden = await startMockMcp({ status: 403 });
+  const invalid = await startMockMcp({ invalidJsonRpc: true });
+  try {
+    await assert.rejects(verifyConnection({ url: forbidden.url, token: FAKE_TOKEN }), /403/);
+    await assert.rejects(verifyConnection({ url: invalid.url, token: FAKE_TOKEN }), /JSON-RPC/);
+  } finally { await forbidden.close(); await invalid.close(); }
+});
+
+test("timeout é relatado sem segredo", async () => {
+  const mock = await startMockMcp({ delayMs: 100 });
+  try {
+    await assert.rejects(verifyConnection({ url: mock.url, token: FAKE_TOKEN, timeoutMs: 10 }),
+      (error) => /Tempo limite/.test(error.message) && !error.message.includes(FAKE_TOKEN));
+  } finally { await mock.close(); }
 });
 
 test("rejeita catálogo sem metadata obrigatória", async () => {
@@ -51,6 +100,12 @@ test("mock simula human_action_required", async () => {
       payload: { jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "crm_fixture_1", arguments: {} } },
     });
     assert.match(JSON.stringify(response.messages), /human_action_required/);
+    assert.equal(response.messages[0].result.structuredContent.code, "fixture_human");
+    const error = await requestMcp({
+      url: mock.url, token: FAKE_TOKEN,
+      payload: { jsonrpc: "2.0", id: 10, method: "unknown/method" },
+    });
+    assert.equal(error.messages[0].error.code, -32601);
   } finally {
     await mock.close();
   }

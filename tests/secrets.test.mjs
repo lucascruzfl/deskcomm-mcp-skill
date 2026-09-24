@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { install } from "../src/installer.mjs";
@@ -16,7 +17,7 @@ test("token fica somente na credencial 0600 fora do projeto", async () => {
   try {
     const result = await install({ client: "codex", scope: "project", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
     assert(!result.credentialFile.startsWith(projectRoot));
-    assert.equal((await stat(result.credentialFile)).mode & 0o777, 0o600);
+    if (process.platform !== "win32") assert.equal((await stat(result.credentialFile)).mode & 0o777, 0o600);
     const projectText = await collectText(projectRoot);
     assert.doesNotMatch(projectText, new RegExp(FAKE_TOKEN));
     assert.match(await readFile(result.credentialFile, "utf8"), new RegExp(FAKE_TOKEN));
@@ -26,7 +27,7 @@ test("token fica somente na credencial 0600 fora do projeto", async () => {
 });
 
 test("repositório não contém padrão de token real além da fixture declarada", async () => {
-  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const text = await collectText(root, new Set([".git", "node_modules"]));
   const matches = text.match(/dsk_[A-Za-z0-9_-]{12,}/g) ?? [];
   assert(matches.every((value) => value === FAKE_TOKEN || value === "dsk_wrong_secret_value"));

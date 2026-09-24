@@ -1,4 +1,4 @@
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -12,12 +12,18 @@ export async function saveCredential({ profile, url, token, pathOptions = {} }) 
   }
   const file = credentialPath(pathOptions, profile);
   await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const candidate = `${file}.candidate-${process.pid}-${Date.now()}`;
   await atomicWrite(
-    file,
+    candidate,
     `${JSON.stringify({ profile, url, token, installer_version: VERSION }, null, 2)}\n`,
     { mode: 0o600, backup: false },
   );
-  const protection = await protectCredential(file, pathOptions.platform ?? process.platform, pathOptions.env ?? process.env);
+  const protection = await protectCredential(candidate, pathOptions.platform ?? process.platform, pathOptions.env ?? process.env);
+  if (!protection.ok) {
+    await rm(candidate, { force: true });
+    throw new Error("Não foi possível proteger a credencial no sistema. Instalação interrompida.");
+  }
+  await rename(candidate, file);
   return { file, protection };
 }
 

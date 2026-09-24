@@ -15,10 +15,10 @@ for (const client of ["codex", "claude"]) {
       const home = path.join(base, "User Home");
       const projectRoot = path.join(base, "Project Root");
       const pathOptions = pathOptionsFor(home);
-      const mock = await startMockMcp({ toolCount: 203 });
+      const mock = await startMockMcp({ toolCount: 17 });
       try {
         const first = await install({ client, scope, profile: "acme", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
-        assert.equal(first.verification.tool_count, 203);
+        assert.equal(first.verification.tool_count, 17);
         const configBefore = await readFile(first.configFile, "utf8");
         assert.doesNotMatch(configBefore, new RegExp(FAKE_TOKEN));
 
@@ -64,6 +64,24 @@ test("preserva outro MCP e configuração existente", async () => {
   }
 });
 
+test("uninstall de um perfil preserva Skill e credencial de outro perfil", async () => {
+  const base = await mkdtemp(path.join(os.tmpdir(), "deskcomm-profiles-"));
+  const home = path.join(base, "home");
+  const projectRoot = path.join(base, "project");
+  const pathOptions = pathOptionsFor(home);
+  const mock = await startMockMcp();
+  try {
+    const first = await install({ client: "codex", scope: "project", profile: "one", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
+    const second = await install({ client: "codex", scope: "project", profile: "two", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
+    assert.equal(first.skillDir, second.skillDir);
+    const removed = await uninstall({ client: "codex", scope: "project", profile: "one", projectRoot, pathOptions, removeCredential: true });
+    assert.equal(removed.removedSkill, false);
+    assert.match(await readFile(second.skillDir + "/SKILL.md", "utf8"), /tools\/list/);
+    assert.match(await readFile(second.configFile, "utf8"), /mcp_servers\.deskcomm-two/);
+    assert.match(await readFile(second.credentialFile, "utf8"), /installer_version/);
+  } finally { await mock.close(); }
+});
+
 test("doctor valida config, skill, permissão e conexão sem revelar token", async () => {
   const base = await mkdtemp(path.join(os.tmpdir(), "deskcomm-doctor-"));
   const home = path.join(base, "home");
@@ -80,6 +98,45 @@ test("doctor valida config, skill, permissão e conexão sem revelar token", asy
     await mock.close();
   }
 });
+
+test("update exige conexão válida e preserva versão instalada em falha", async () => {
+  const base = await mkdtemp(path.join(os.tmpdir(), "deskcomm-update-"));
+  const home = path.join(base, "home");
+  const projectRoot = path.join(base, "project");
+  const pathOptions = pathOptionsFor(home);
+  const mock = await startMockMcp();
+  const installed = await install({ client: "codex", scope: "project", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
+  await mock.close();
+  const before = await readFile(path.join(installed.skillDir, ".deskcomm-mcp-skill.json"), "utf8");
+  await assert.rejects(updateInstallations({ pathOptions }), /Não foi possível conectar/);
+  assert.equal(await readFile(path.join(installed.skillDir, ".deskcomm-mcp-skill.json"), "utf8"), before);
+});
+
+for (const client of ["codex", "claude"]) {
+  test(`${client}: uninstall preserva entrada editada externamente`, async () => {
+    const base = await mkdtemp(path.join(os.tmpdir(), "deskcomm-edited-"));
+    const home = path.join(base, "home");
+    const projectRoot = path.join(base, "project");
+    const pathOptions = pathOptionsFor(home);
+    const mock = await startMockMcp();
+    try {
+      const installed = await install({ client, scope: "project", projectRoot, pathOptions, url: mock.url, token: FAKE_TOKEN });
+      let changed;
+      if (client === "codex") {
+        changed = (await readFile(installed.configFile, "utf8")).replace("# managed by deskcomm-mcp-skill: deskcomm\n", "");
+      } else {
+        const config = JSON.parse(await readFile(installed.configFile, "utf8"));
+        config.mcpServers.deskcomm.command = "custom";
+        changed = JSON.stringify(config);
+      }
+      await writeFile(installed.configFile, changed);
+      const removed = await uninstall({ client, scope: "project", projectRoot, pathOptions, removeCredential: true });
+      assert.equal(removed.removedConfig, false);
+      assert.equal(removed.removedCredential, false);
+      assert.equal(await readFile(installed.configFile, "utf8"), changed);
+    } finally { await mock.close(); }
+  });
+}
 
 for (const client of ["codex", "claude"]) {
   test(`${client}: não sobrescreve nem remove entrada homônima não gerenciada`, async () => {

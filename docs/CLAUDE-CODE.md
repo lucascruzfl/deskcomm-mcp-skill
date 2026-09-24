@@ -15,4 +15,5 @@ Nesta versão do pacote, a CLI Claude Code não estava instalada na máquina de 
 formato foi implementado a partir do contrato oficial e testado com HOME temporário, mock de config
 e bridge contra mock MCP; não se afirma teste real de `claude mcp` nesta VPS.
 
-Referência oficial: [Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp).
+Referências oficiais: [Claude Code MCP](https://code.claude.com/docs/en/mcp) e
+[Skills](https://code.claude.com/docs/en/skills).

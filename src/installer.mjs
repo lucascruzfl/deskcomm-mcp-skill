@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,16 +41,24 @@ export async function install(options) {
     ? codexConfigPath({ scope, projectRoot, ...pathOptions })
     : claudeConfigPath({ scope, projectRoot, ...pathOptions });
   let state = await loadState(pathOptions);
-  const managed = state.installations.some((record) => sameInstallation(record, {
+  const managedRecord = state.installations.find((record) => sameInstallation(record, {
     client, scope, profile, project_root: scope === "project" ? projectRoot : null,
   }));
+  const managed = Boolean(managedRecord);
   if (!managed && await configHasServer(client, configFile, name)) {
     throw new Error(`Já existe um servidor MCP chamado '${name}' que não foi criado por este instalador. Nada foi sobrescrito.`);
+  }
+  if (managed && !(await configIsManaged(client, configFile, name, credentialPath(pathOptions, profile), pathOptions, managedRecord.config_definition))) {
+    throw new Error("A entrada MCP Deskcomm foi alterada fora do instalador. Configuração preservada.");
+  }
+  if (await exists(skillDir) && !(await isManagedSkill(skillDir))) {
+    throw new Error("Já existe uma Skill Deskcomm não gerenciada neste destino. Arquivos preservados.");
   }
   const saved = await saveCredential({ profile, url, token, pathOptions });
   const runtime = await installRuntime(pathOptions);
   await installSkill(skillDir);
 
+  let configDefinition;
   if (client === "codex") {
     const helperCommand = headerHelperCommand({
       nodePath: options.nodePath ?? process.execPath,
@@ -58,16 +66,18 @@ export async function install(options) {
       credentialFile: saved.file,
       platform: pathOptions.platform,
     });
+    configDefinition = { url, helper_command: helperCommand };
     await installCodexConfig({ configFile, name, url, helperCommand });
   } else {
+    configDefinition = claudeServerDefinition({
+      nodePath: options.nodePath ?? process.execPath,
+      bridgePath: runtime.bridge,
+      credentialFile: saved.file,
+    });
     await installClaudeConfig({
       configFile,
       name,
-      definition: claudeServerDefinition({
-        nodePath: options.nodePath ?? process.execPath,
-        bridgePath: runtime.bridge,
-        credentialFile: saved.file,
-      }),
+      definition: configDefinition,
     });
   }
 
@@ -80,17 +90,28 @@ export async function install(options) {
     config_file: configFile,
     skill_dir: skillDir,
     credential_file: saved.file,
+    config_definition: configDefinition,
     installed_version: VERSION,
   });
   await saveState(state, pathOptions);
   return { client, scope, profile, url, configFile, skillDir, credentialFile: saved.file, protection: saved.protection, verification };
 }
 
-export async function updateInstallations({ pathOptions = {} } = {}) {
+export async function updateInstallations({ pathOptions = {}, fetchImpl = fetch } = {}) {
   const state = await loadState(pathOptions);
+  for (const record of state.installations) {
+    const credential = await loadCredential({ profile: record.profile, pathOptions });
+    await verifyConnection({ url: credential.url, token: credential.token, fetchImpl });
+    if (!(await isManagedSkill(record.skill_dir))) {
+      throw new Error(`Skill não gerenciada ou ausente: ${record.skill_dir}. Update interrompido.`);
+    }
+    if (!(await configIsManaged(record.client, record.config_file, record.server_name, record.credential_file, pathOptions, record.config_definition))) {
+      throw new Error(`Configuração MCP alterada: ${record.config_file}. Update interrompido.`);
+    }
+  }
   await installRuntime(pathOptions);
   for (const record of state.installations) await installSkill(record.skill_dir);
-  await saveState(state, pathOptions);
+  await saveState({ ...state, installations: state.installations.map((record) => ({ ...record, installed_version: VERSION })) }, pathOptions);
   return { updated: state.installations.length, version: VERSION };
 }
 
@@ -107,20 +128,21 @@ export async function uninstall(options) {
   }));
   if (!managedRecord) return { removedConfig: false, removedSkill: false, removedCredential: false };
   const configFile = managedRecord.config_file;
-  const removedConfig = client === "codex"
+  const configManaged = await configIsManaged(client, configFile, name, managedRecord.credential_file, pathOptions, managedRecord.config_definition);
+  const removedConfig = !configManaged ? false : client === "codex"
     ? await uninstallCodexConfig({ configFile, name })
     : await uninstallClaudeConfig({ configFile, name });
   const skillDir = managedRecord.skill_dir;
-  const hadManagedSkill = await isManagedSkill(skillDir);
-  if (hadManagedSkill) await removeIfExists(skillDir);
-
   const installations = state.installations.filter((record) => !(
     record.client === client && record.scope === scope && record.profile === profile &&
     (scope !== "project" || record.project_root === projectRoot)
   ));
+  const hadManagedSkill = await isManagedSkill(skillDir) &&
+    !installations.some((record) => record.skill_dir === skillDir);
+  if (hadManagedSkill) await removeIfExists(skillDir);
   await saveState({ ...state, installations }, pathOptions);
   let removedCredential = false;
-  if (options.removeCredential && !installations.some((record) => record.profile === profile)) {
+  if (options.removeCredential && !installations.some((record) => record.profile === profile) && configManaged) {
     await removeIfExists(credentialPath(pathOptions, profile));
     removedCredential = true;
   }
@@ -140,6 +162,10 @@ export async function installationStatus({ client, scope = "project", profile = 
   const occurrences = client === "codex"
     ? config.split(`[mcp_servers.${name}]`).length - 1
     : (config?.mcpServers?.[name] ? 1 : 0);
+  const state = await loadState(pathOptions);
+  const record = state.installations.find((item) => sameInstallation(item, {
+    client, scope, profile: cleanProfile, project_root: scope === "project" ? root : null,
+  }));
   return {
     configFile,
     serverName: name,
@@ -148,6 +174,7 @@ export async function installationStatus({ client, scope = "project", profile = 
     credential: await tryLoadCredential(cleanProfile, pathOptions),
     skillDir,
     credentialFile,
+    configManaged: Boolean(record) && await configIsManaged(client, configFile, name, credentialFile, pathOptions, record.config_definition),
   };
 }
 
@@ -162,10 +189,15 @@ async function installRuntime(pathOptions) {
 }
 
 async function installSkill(target) {
+  if (await isManagedSkill(target)) {
+    await removeIfExists(path.join(target, "references"));
+    await removeIfExists(path.join(target, "agents"));
+  }
   await mkdir(target, { recursive: true, mode: 0o700 });
-  await cp(path.join(packageRoot, "SKILL.md"), path.join(target, "SKILL.md"));
-  await cp(path.join(packageRoot, "references"), path.join(target, "references"), { recursive: true, force: true });
-  await cp(path.join(packageRoot, "agents"), path.join(target, "agents"), { recursive: true, force: true });
+  const source = path.join(packageRoot, "skills", "deskcomm");
+  await cp(path.join(source, "SKILL.md"), path.join(target, "SKILL.md"));
+  await cp(path.join(source, "references"), path.join(target, "references"), { recursive: true, force: true });
+  await cp(path.join(source, "agents"), path.join(target, "agents"), { recursive: true, force: true });
   await atomicWrite(
     path.join(target, ".deskcomm-mcp-skill.json"),
     `${JSON.stringify({ managed_by: "deskcomm-mcp-skill", version: VERSION })}\n`,
@@ -207,6 +239,27 @@ async function configHasServer(client, configFile, name) {
   }
   const content = await readJson(configFile, {});
   return Boolean(content?.mcpServers?.[name]);
+}
+
+async function configIsManaged(client, configFile, name, credentialFile, pathOptions, expected) {
+  if (client === "codex") {
+    const content = await readText(configFile, "");
+    const marker = `# managed by deskcomm-mcp-skill: ${name}\n[mcp_servers.${name}]`;
+    if (!content.includes(marker)) return false;
+    return !expected || content.includes(`${marker}\nurl = ${JSON.stringify(expected.url)}\nhttp_headers_helper = ${JSON.stringify(expected.helper_command)}\n`);
+  }
+  const content = await readJson(configFile, {});
+  const server = content?.mcpServers?.[name];
+  if (expected) return JSON.stringify(server) === JSON.stringify(expected);
+  return server?.type === "stdio" && server?.args?.[0] === path.join(runtimeDir(pathOptions), "bridge.mjs") &&
+    server?.args?.[1] === "--credential" && server?.args?.[2] === credentialFile;
+}
+
+async function exists(target) {
+  try { await stat(target); return true; } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 function sameInstallation(record, target) {

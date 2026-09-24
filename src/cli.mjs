@@ -37,25 +37,23 @@ export async function runCli(argv = process.argv.slice(2), io = console) {
   if (command === "verify-connection") {
     const credential = await loadCredential({ profile });
     const result = await verifyConnection({ url: credential.url, token: credential.token });
-    io.log(`Conexão MCP válida. tools/list retornou ${result.tool_count} ferramentas.`);
-    if (result.missing_essential_hints.length) {
-      io.warn(`Aviso: ${result.missing_essential_hints.length} ferramentas operacionais esperadas não estão visíveis para este token.`);
-    }
+    io.log(`Connected | Endpoint OK | Handshake OK | tools/list: ${result.tool_count} | Duplicates: 0 | Schemas: OK`);
     return 0;
   }
 
   if (command === "doctor") {
     const client = flags.client ?? positionals[1] ?? "codex";
     const result = await doctor({ client, scope, profile, projectRoot });
-    for (const item of result.checks) io.log(`${item.ok ? "OK" : "FALHA"} ${item.name}: ${item.detail}`);
+    for (const item of result.checks) io.log(`${item.ok ? "OK" : item.optional ? "AVISO" : "FALHA"} ${item.name}: ${item.detail}`);
     return result.ok ? 0 : 1;
   }
 
   if (command === "uninstall") {
     const client = flags.client ?? positionals[1];
     if (!client) throw new Error("Informe o cliente: uninstall codex ou uninstall claude.");
+    if (flags.removeCredential && flags.keepCredential) throw new Error("Use apenas uma opção de credencial.");
     let removeCredential = Boolean(flags.removeCredential);
-    if (!flags.yes && !flags.keepCredential && process.stdin.isTTY) {
+    if (!flags.removeCredential && !flags.yes && !flags.keepCredential && process.stdin.isTTY) {
       const answer = await promptText("Remover também a credencial local deste perfil? (s/N)", { defaultValue: "N" });
       removeCredential = /^s(im)?$/i.test(answer);
     }
@@ -66,13 +64,13 @@ export async function runCli(argv = process.argv.slice(2), io = console) {
 
   if (command === "update") {
     const result = await updateInstallations();
-    io.log(`${result.updated} instalação(ões) atualizada(s) para ${result.version}; URL, token e outros MCPs foram preservados.`);
+    io.log(`${result.updated} instalação(ões) atualizada(s) para ${result.version}; conexão verificada, URL, token e outros MCPs preservados.`);
     return 0;
   }
 
   if (command === "generate-tools-reference") {
     const credential = await loadCredential({ profile });
-    const markdown = await generateToolsReference({ url: credential.url, token: credential.token });
+    const markdown = await generateToolsReference({ url: credential.url, token: credential.token, profile });
     const output = path.resolve(flags.output ?? "deskcomm-mcp-tools.generated.md");
     await atomicWrite(output, markdown, { mode: 0o644, backup: true });
     io.log(`Snapshot gerado em ${output}. Ele não é fonte de verdade para runtime.`);

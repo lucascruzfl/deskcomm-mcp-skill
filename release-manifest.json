@@ -1,44 +1,14 @@
 {
-  "schema_version": 1,
-  "release_date": "2026-09-22",
-  "crm": {
-    "repository": "/root/DeskcommCRM",
-    "branch": "feat/mcp-full-control",
-    "tested_commit": "76ff5d684033be402db4d70bf9d899a47a68b67f",
-    "base_tag": "v1.41.0",
-    "minimum_known_version": "1.41.0",
-    "upstream_incorporated_commit": "3538380b9925dba9203dc01170d9bc73452cdf53",
-    "mcp_migrations": [
-      "20260921092259_0382_replace_faq_atomico.sql"
-    ],
-    "tool_count_snapshot": 202,
-    "tool_count_is_requirement": false,
-    "runtime_source_of_truth": "tools/list"
+  "schema_version": 2,
+  "release_date": "2026-09-24",
+  "skill_version": "0.2.0",
+  "crm_reference": {
+    "branch": "mcp/stable",
+    "validated_release": "v1.47.0-mcp",
+    "runtime_source_of_truth": "tools/list",
+    "tool_count_is_requirement": false
   },
-  "skill": {
-    "repository": "/root/deskcomm-mcp-skill",
-    "implementation_commit": "15ac293463a55989c08a7a2ac4755e6849786afb",
-    "hardening_commit": "f6f619981bec12757bf08ba46f68f1914d9f5e9e",
-    "version": "0.1.0",
-    "clients": {
-      "codex_cli": "validated with 0.155.1 and temporary HOME",
-      "claude_code": "CLI unavailable; config and bridge validated with temporary HOME and mock MCP"
-    }
-  },
-  "tests": [
-    "npm run verify",
-    "node --test tests/cross-platform.test.mjs",
-    "node --test tests/installer.test.mjs",
-    "node --test tests/mcp-client.test.mjs",
-    "node --test tests/secrets.test.mjs",
-    "skill-creator quick_validate.py",
-    "npm pack --dry-run",
-    "Codex config parsed by codex mcp get in temporary HOME"
-  ],
-  "not_executed": [
-    "real Claude Code CLI validation",
-    "real production MCP connection",
-    "deploy",
-    "push"
-  ]
+  "supported_clients": ["codex", "claude-code"],
+  "supported_scopes": ["project", "global"],
+  "credential_location": "user configuration directory outside project"
 }

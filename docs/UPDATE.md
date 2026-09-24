@@ -1,7 +1,9 @@
 # Atualização
 
-Reexecute o mesmo comando NPX ou rode `npx ... update`. O update substitui apenas arquivos de
-runtime e Skill marcados como gerenciados. Ele preserva:
+Execute `npx github:lucascruzfl/deskcomm-mcp-skill update` para baixar o pacote atual e
+atualizar as instalações registradas. Antes de copiar arquivos, o update confirma a conexão de
+cada perfil por handshake e `tools/list`, e verifica os marcadores de propriedade da Skill e
+configuração. Ele preserva:
 
 - URL e token de cada perfil;
 - escopo e projeto;

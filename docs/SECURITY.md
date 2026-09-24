@@ -2,8 +2,8 @@
 
 - O token nunca entra no Git, README, Skill, config do projeto, log, mensagem de erro ou snapshot.
 - Não existe opção `--token`; use prompt sem eco, stdin ou variável de ambiente.
-- A credencial local fica fora de projetos. POSIX exige 0600; Windows usa `icacls` quando
-  disponível e relata quando não consegue confirmar a ACL.
+- A credencial local fica fora de projetos. POSIX exige 0600; Windows usa `icacls` e interrompe
+  a instalação quando não consegue confirmar a ACL.
 - Codex recebe o header por helper. Claude recebe o token somente dentro do bridge local.
 - Backups de config não contêm token porque a config gerenciada também não contém token.
 - `verify-connection` e `doctor` redigem falhas de rede/autenticação e nunca incluem o bearer.

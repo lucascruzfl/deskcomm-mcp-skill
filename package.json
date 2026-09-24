@@ -1,6 +1,6 @@
 {
   "name": "deskcomm-mcp-skill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Instalador reproduzível da Skill e da conexão MCP do DeskcommCRM para Codex CLI e Claude Code.",
   "type": "module",
   "bin": {
@@ -11,10 +11,8 @@
     "src/",
     "runtime/",
     "docs/",
-    "agents/",
-    "references/",
+    "skills/",
     "templates/",
-    "SKILL.md",
     "README.md",
     "release-manifest.json",
     "LICENSE"
@@ -25,9 +23,10 @@
     "test:mock-mcp": "node --test tests/mcp-client.test.mjs",
     "test:installer": "node --test tests/installer.test.mjs",
     "test:secrets": "node --test tests/secrets.test.mjs",
+    "secret-sentinel": "node scripts/secret-sentinel.mjs",
     "lint": "node scripts/check-syntax.mjs",
     "typecheck": "node scripts/check-syntax.mjs",
-    "verify": "npm run lint && npm test",
+    "verify": "npm run lint && npm test && npm run secret-sentinel",
     "pack:dry-run": "npm pack --dry-run"
   },
   "engines": {

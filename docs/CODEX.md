@@ -1,6 +1,6 @@
 # Codex CLI
 
-Contrato validado localmente com Codex CLI 0.155.1. O Codex suporta MCP Streamable HTTP em
+O Codex suporta MCP Streamable HTTP em
 `~/.codex/config.toml` e, para projetos confiáveis, `.codex/config.toml`.
 
 O instalador usa:

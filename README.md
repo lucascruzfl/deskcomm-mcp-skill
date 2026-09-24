@@ -1,77 +1,97 @@
-# deskcomm-mcp-skill
+# Deskcomm MCP Skill
 
-Instala a Skill operacional e registra um DeskcommCRM self-hosted como servidor MCP no Codex CLI
-ou no Claude Code. O pacote é independente do código-fonte do CRM e descobre o catálogo permitido
-ao token por `tools/list`; nenhuma quantidade histórica de tools é requisito de runtime.
+Instala uma Agent Skill e registra uma instância self-hosted do DeskcommCRM no Codex ou Claude
+Code. A Skill consulta `tools/list` em cada sessão para escolher tools pelo nome, descrição e
+schema. A lista pode variar por versão, token, scopes, allowlist, capabilities e módulos opcionais;
+nenhuma quantidade fixa é exigida.
 
 ## Requisitos
 
-- Node.js 20 ou superior;
-- uma URL HTTPS do DeskcommCRM;
-- um token MCP `dsk_...` criado no CRM com os scopes/capabilities necessários;
-- Codex CLI ou Claude Code, conforme o cliente escolhido.
+- Node.js 20 ou superior e `npx`;
+- Codex CLI ou Claude Code;
+- URL HTTPS da sua instância DeskcommCRM e token MCP emitido nela.
 
-O endpoint oficial é `<base-url>/api/mcp`. O instalador aceita a base ou o endpoint completo e
-normaliza a URL.
+O instalador aceita a base (`https://crm.exemplo.com`) ou o endpoint completo
+(`https://crm.exemplo.com/api/mcp`). Para testes locais, aceita HTTP apenas em localhost. A URL
+é solicitada interativamente ou passada com `--url`; o token é solicitado sem eco. O instalador
+verifica handshake e `tools/list` antes de gravar a instalação.
 
-## Instalação por NPX
+## Instalar
 
-Para testar a cópia local, rode:
+Execute no diretório do projeto para a instalação de projeto. O `npx` baixa a versão atual do
+GitHub. Os mesmos comandos funcionam em PowerShell, cmd, Linux e macOS:
 
-```bash
-npx /caminho/para/deskcomm-mcp-skill codex
-npx /caminho/para/deskcomm-mcp-skill claude
-```
-
-Para instalar a versão publicada no GitHub:
-
-```bash
+```text
 npx github:lucascruzfl/deskcomm-mcp-skill codex
+npx github:lucascruzfl/deskcomm-mcp-skill codex --global
 npx github:lucascruzfl/deskcomm-mcp-skill claude
+npx github:lucascruzfl/deskcomm-mcp-skill claude --global
 ```
 
-O padrão instala no projeto atual. Acrescente `--global` para o nível do usuário. O token é pedido
-sem eco. Em automação, passe por stdin ou por uma variável já definida:
+Use `--url https://seu-host` para informar a URL sem prompt. Use `--project-dir "C:\Users\Nome Sobrenome\Meu Projeto"`
+para escolher outro projeto. Em Windows, execute no PowerShell ou cmd; as aspas duplas protegem
+caminhos com espaços. O token não deve ser passado como argumento. Em automação, use
+`--token-env DESKCOMM_MCP_TOKEN` com variável já definida no processo, ou `--token-stdin`
+por um canal protegido. Não grave o token em script, perfil do shell, histórico, projeto ou Git.
 
-```bash
-printf '%s' "$DESKCOMM_MCP_TOKEN" | npx . codex --token-stdin --url https://crm.exemplo.com
-npx . claude --global --token-env DESKCOMM_MCP_TOKEN --url https://crm.exemplo.com
+No Windows, o instalador guarda a credencial sob `%APPDATA%\DeskcommMCP\profiles` com ACL
+restrita. Em Linux/macOS, usa `~/.config/deskcomm-mcp/profiles` (ou `XDG_CONFIG_HOME`) com
+permissão 0600. O token não entra no TOML/JSON do cliente: Codex usa
+`http_headers_helper`; Claude Code usa um pequeno bridge stdio que lê a credencial do usuário.
+Reinicie o cliente depois de instalar.
+
+## Verificar e diagnosticar
+
+```text
+npx github:lucascruzfl/deskcomm-mcp-skill verify-connection
+npx github:lucascruzfl/deskcomm-mcp-skill doctor codex
+npx github:lucascruzfl/deskcomm-mcp-skill doctor claude
 ```
 
-Não há flag `--token`: isso evita gravar o segredo no histórico e na lista de processos. A
-instalação só é escrita depois de handshake e `tools/list` válidos.
+Acrescente `--global` ao doctor para instalação global; `--project-dir "CAMINHO"` seleciona
+outro projeto. `verify-connection` faz somente handshake e `tools/list`, valida JSON-RPC,
+schemas e duplicatas e informa a quantidade visível. Não chama `tools/call` nem imprime token.
+Uma lista menor, inclusive vazia, pode ser legítima. O doctor verifica Node, paths, configuração,
+credencial e conexão, e distingue autenticação 401, autorização 403, timeout e TLS.
 
-## Operação
+## Atualizar
 
-```bash
-npx . verify-connection
-npx . doctor codex
-npx . doctor claude --global
-npx . update
-npx . uninstall codex --remove-credential
-npx . generate-tools-reference --output tools.generated.md
+```text
+npx github:lucascruzfl/deskcomm-mcp-skill update
 ```
 
-`update` atualiza Skill e runtime sem apagar URL, token, perfil ou outros servidores MCP.
-`uninstall` remove apenas entradas e arquivos marcados como gerenciados por este instalador. A
-credencial é preservada, salvo confirmação/`--remove-credential` quando nenhum outro cliente usa o
-perfil.
+O `npx` obtém o pacote atual do GitHub; `update` verifica todas as conexões gerenciadas e
+atualiza Skill e runtime registrados sem duplicar entrada MCP ou substituir configurações alheias.
+URL e token permanecem no perfil externo. Para mudar URL/token, reexecute o comando de instalação
+correspondente; a reinstalação é idempotente. Se uma entrada foi editada fora do instalador, ele
+interrompe para preservar a edição.
 
-## Documentação
+## Desinstalar
 
-- [Instalação](docs/INSTALLATION.md)
-- [Codex](docs/CODEX.md)
-- [Claude Code](docs/CLAUDE-CODE.md)
-- [Segurança](docs/SECURITY.md)
-- [Diagnóstico](docs/TROUBLESHOOTING.md)
-- [Atualização](docs/UPDATE.md)
-
-## Desenvolvimento
-
-```bash
-npm test
-npm run lint
-npm pack --dry-run
+```text
+npx github:lucascruzfl/deskcomm-mcp-skill uninstall codex
+npx github:lucascruzfl/deskcomm-mcp-skill uninstall codex --global
+npx github:lucascruzfl/deskcomm-mcp-skill uninstall claude
+npx github:lucascruzfl/deskcomm-mcp-skill uninstall claude --global
 ```
 
-Os testes usam HOME temporário e mock MCP; não acessam produção nem usam secrets reais.
+Remove apenas a Skill marcada como gerenciada e a entrada MCP do cliente correspondente. Outros
+MCPs, Skills e configurações ficam. A credencial externa permanece; use `--remove-credential`
+somente quando nenhum outro cliente usa o perfil e você realmente deseja apagá-la.
+
+## Segurança e operação
+
+Use token com menor privilégio. A organização é resolvida pelo servidor, e o catálogo exposto
+reflete role, scopes, allowlist e capabilities. A Skill lê antes de escrever, segue
+`inputSchema`, preserva `idempotency_key` em retries e respeita ações humanas para QR,
+OAuth, uploads, consentimento e operações protegidas. Não contorne o MCP por SQL, REST
+administrativo ou infraestrutura.
+
+Para um snapshot local de diagnóstico, use
+`npx github:lucascruzfl/deskcomm-mcp-skill generate-tools-reference --output tools.generated.md`.
+O arquivo indica data, versão e perfil; revise antes de compartilhar. `tools/list` runtime
+sempre prevalece.
+
+Detalhes: [instalação](docs/INSTALLATION.md), [Codex](docs/CODEX.md),
+[Claude Code](docs/CLAUDE-CODE.md), [diagnóstico](docs/TROUBLESHOOTING.md),
+[segurança](docs/SECURITY.md) e [atualização](docs/UPDATE.md).

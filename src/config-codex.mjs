@@ -3,7 +3,9 @@ import { MANAGED_COMMENT } from "./constants.mjs";
 
 function escapeCommandArg(value, platform = process.platform) {
   const text = String(value);
-  if (platform === "win32") return `"${text.replace(/"/g, '\\"')}"`;
+  if (platform === "win32") {
+    return `"${text.replace(/(\\*)"/g, (_, slashes) => `${slashes}${slashes}\\\"`).replace(/(\\+)$/, "$1$1")}"`;
+  }
   return `'${text.replace(/'/g, `'"'"'`)}'`;
 }
 

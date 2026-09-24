@@ -14,8 +14,7 @@ export function normalizeMcpUrl(raw) {
     throw new Error("A URL MCP deve usar HTTPS; HTTP só é aceito para localhost em testes locais.");
   }
   if (url.username || url.password) throw new Error("A URL não pode conter usuário ou senha.");
-  url.hash = "";
-  url.search = "";
+  if (url.search || url.hash) throw new Error("A URL MCP não pode conter query string ou fragmento.");
   const path = url.pathname.replace(/\/+$/, "");
   url.pathname = path === "" || path === "/" ? MCP_PATH : path.endsWith(MCP_PATH) ? path : `${path}${MCP_PATH}`;
   return url.toString().replace(/\/$/, "");

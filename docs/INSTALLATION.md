@@ -13,16 +13,16 @@ O token pode vir de prompt sem eco, `--token-stdin` ou `--token-env NOME`. A URL
 (`https://crm.exemplo.com`) ou o endpoint completo (`https://crm.exemplo.com/api/mcp`). HTTP é
 recusado, exceto localhost para testes.
 
-Antes de escrever arquivos, o instalador executa `initialize` e `tools/list`. O critério é catálogo
-não vazio e cada tool possuir `name`, `description` e `inputSchema`. A contagem impressa é
-informativa.
+Antes de escrever arquivos, o instalador executa `initialize` e `tools/list`. O critério é
+JSON-RPC válido, schemas básicos válidos e nomes sem duplicatas. O catálogo pode estar vazio por
+autorização. A contagem impressa é informativa.
 
 ## Arquivos criados
 
 No POSIX, credencial/estado/runtime ficam em `~/.config/deskcomm-mcp/` (ou
 `$XDG_CONFIG_HOME/deskcomm-mcp`) e a credencial recebe modo 0600. No Windows, ficam em
-`%APPDATA%\DeskcommMCP` e o instalador tenta remover herança e restringir a ACL com `icacls`; um
-aviso explícito é emitido se a proteção não puder ser confirmada.
+`%APPDATA%\DeskcommMCP` e o instalador remove herança e restringe a ACL com `icacls`. Se a
+proteção falhar, a instalação é interrompida e a credencial anterior é preservada.
 
 Configurações existentes são lidas e preservadas. Antes de alterar uma configuração existente, é
 criado um `.bak`. Reinstalar o mesmo cliente/escopo/perfil atualiza somente a entrada Deskcomm.
